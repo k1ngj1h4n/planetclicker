@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Planet Clicker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: radial-gradient(circle, #0b0c10, #1f2833);
+      color: #66fcf1;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+    #planet {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      margin: 20px auto;
+      cursor: pointer;
+      box-shadow: 0 0 20px #45a29e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    button, select {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 16px;
+      background-color: #1f2833;
+      border: 2px solid #66fcf1;
+      color: #66fcf1;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🌍 Planet Clicker</h1>
+
+<label for="planetSelect">Choose your planet:</label>
+<select id="planetSelect" onchange="changePlanet()">
+  <option value="earth">Earth (Free)</option>
+  <option value="mars" disabled>Mars (10,000 Stardust)</option>
+  <option value="jupiter" disabled>Jupiter (20,000 Stardust)</option>
+  <option value="venus" disabled>Venus (40,000 Stardust)</option>
+  <option value="saturn" disabled>Saturn (80,000 Stardust)</option>
+  <option value="uranus" disabled>Uranus (160,000 Stardust)</option>
+  <option value="neptune" disabled>Neptune (320,000 Stardust)</option>
+  <option value="pluto" disabled>Pluto (640,000 Stardust)</option>
+</select>
+
+<div id="planet" onclick="clickPlanet()">Planet</div>
+<h2>Stardust: <span id="stardust">0</span></h2>
+
+<div>
+  <button onclick="buyUpgrade()" id="upgradeBtn">
+    Upgrade (+1/click)<br>Cost: <span id="upgradeCost">10</span>
+  </button>
+</div>
+
+<div>
+  <button onclick="buyAutoClicker()" id="autoClickerBtn">
+    Auto-Clicker (+1/sec)<br>Cost: <span id="autoClickerCost">50</span>
+  </button>
+  <p>Auto-Clickers: <span id="autoClickers">0</span></p>
+</div>
+
+<hr>
+<h2>🛒 Shop</h2>
+<div>
+  <button onclick="buyMultiplier()" id="multiplierBtn">Galactic Multiplier (x2/click) - 500</button><br>
+  <button onclick="buyFasterAuto()" id="fasterAutoBtn">Time Dilation (Auto Speed x2) - 800</button><br>
+  <button onclick="buyClickBoost()" id="clickBoostBtn">Quantum Booster (+2/click) - 300</button><br>
+  <button onclick="buyHyperClicker()" id="hyperClickerBtn">Hyper Clicker (+5/click) - 1200</button><br>
+  <button onclick="buyMegaAutoClicker()" id="megaAutoClickerBtn">Mega Auto (+5/sec) - 1500</button>
+</div>
+
+<hr>
+<h2>🏆 Achievements</h2>
+<ul id="achievements">
+  <li id="achv1" style="display:none;">Clicked 100 times!</li>
+  <li id="achv2" style="display:none;">Bought 5 Auto-Clickers!</li>
+  <li id="achv3" style="display:none;">Earned 1,000 Stardust!</li>
+</ul>
+
+<div>
+  <button onclick="saveGame()">💾 Save Game</button>
+  <button onclick="loadGame()">🔄 Load Game</button>
+  <button onclick="resetGame()">🗑️ Reset</button>
+</div>
+
+<script>
+let stardust = 0;
+let basePerClick = 1;
+let perClick = basePerClick;
+let upgradeCost = 10;
+let autoClickers = 0;
+let autoClickerCost = 50;
+let totalClicks = 0;
+let autoInterval = 1000;
+let autoClickerInterval;
+
+let multiplierBought = 0; // Track multiplier levels
+let fasterAutoBought = 0; // Track how many times the speed was upgraded
+let clickBoostBought = 0; // Track click boost levels
+let hyperClickerBought = 0; // Track hyper clicker levels
+let megaAutoClickerBought = 0; // Track how many mega auto clickers were bought
+
+// Planet data with cost and click bonus
+const planets = {
+  earth: { name: "Earth", color: "radial-gradient(circle, #45a29e, #0b0c10)", cost: 0, bonus: 0 },
+  mars: { name: "Mars", color: "radial-gradient(circle, #ff5e57, #d83a2f)", cost: 10000, bonus: 0.05 },
+  jupiter: { name: "Jupiter", color: "radial-gradient(circle, #f9c74f, #f2a900)", cost: 20000, bonus: 0.10 },
+  venus: { name: "Venus", color: "radial-gradient(circle, #ffc2d1, #ff758f)", cost: 40000, bonus: 0.15 },
+  saturn: { name: "Saturn", color: "radial-gradient(circle, #ffe066, #fab005)", cost: 80000, bonus: 0.20 },
+  uranus: { name: "Uranus", color: "radial-gradient(circle, #7bdff2, #3cdbd3)", cost: 160000, bonus: 0.25 },
+  neptune: { name: "Neptune", color: "radial-gradient(circle, #4f83cc, #005082)", cost: 320000, bonus: 0.30 },
+  pluto: { name: "Pluto", color: "radial-gradient(circle, #c9d6df, #52616b)", cost: 640000, bonus: 0.35 }
+};
+
+let currentPlanet = "earth";
+
+// Click planet
+function clickPlanet() {
+  stardust += perClick;
+  totalClicks++;
+  checkAchievements();
+  updateDisplay();
+}
+
+// Update planet appearance
+function updatePlanetAppearance() {
+  const div = document.getElementById("planet");
+  div.style.background = planets[currentPlanet].color;
+  div.textContent = `Planet: ${planets[currentPlanet].name}`;
+}
+
+// Planet selection with cost
+function changePlanet() {
+  const selected = document.getElementById("planetSelect").value;
+  const planet = planets[selected];
+  if (selected === currentPlanet) return;
+
+  if (stardust >= planet.cost && isPlanetUnlocked(selected)) {
+    stardust -= planet.cost;
+    currentPlanet = selected;
+    perClick = Math.floor(basePerClick * (1 + planet.bonus));
+    updatePlanetAppearance();
+    updateDisplay();
+    unlockNextPlanet(selected);
+  } else {
+    alert(`You need ${planet.cost} Stardust to enter ${planet.name}.`);
+  }
+}
+
+// Unlock next planet if current one is unlocked
+function unlockNextPlanet(planetName) {
+  const planetList = Object.keys(planets);
+  const currentIndex = planetList.indexOf(planetName);
+  if (currentIndex < planetList.length - 1) {
+    const nextPlanet = planetList[currentIndex + 1];
+    document.querySelector(`#planetSelect option[value=${nextPlanet}]`).disabled = false;
+  }
+}
+
+// Check if the previous planet is unlocked
+function isPlanetUnlocked(planetName) {
+  const planetList = Object.keys(planets);
+  const currentIndex = planetList.indexOf(planetName);
+  if (currentIndex === 0) return true; // Earth is always unlocked
+  const previousPlanet = planetList[currentIndex - 1];
+  return currentPlanet === previousPlanet;
+}
+
+// Buy upgrade
+function buyUpgrade() {
+  if (stardust >= upgradeCost) {
+    stardust -= upgradeCost;
+    basePerClick += 1;
+    perClick = Math.floor(basePerClick * (1 + planets[currentPlanet].bonus));
+    upgradeCost = Math.floor(upgradeCost * 1.5);
+    updateDisplay();
+  }
+}
+
+// Buy auto-clicker
+function buyAutoClicker() {
+  if (stardust >= autoClickerCost) {
+    stardust -= autoClickerCost;
+    autoClickers += 1;
+    autoClickerCost = Math.floor(autoClickerCost * 1.7);
+    updateDisplay();
+  }
+}
+
+// Shop items
+function buyMultiplier() {
+  if (stardust >= 500) {
+    stardust -= 500;
+    multiplierBought += 1;
+    basePerClick *= 2;
+    perClick = Math.floor(basePerClick * (1 + planets[currentPlanet].bonus));
+    updateDisplay();
+  }
+}
+function buyFasterAuto() {
+  if (stardust >= 800) {
+    stardust -= 800;
+    fasterAutoBought += 1;
+    autoInterval = 1000 - (fasterAutoBought * 200); // Each upgrade reduces the interval by 200ms
+    startAutoClickers();
+    updateDisplay();
+  }
+}
+function buyClickBoost() {
+  if (stardust >= 300) {
+    stardust -= 300;
+    clickBoostBought += 1;
+    basePerClick += 2 * clickBoostBought; // Each boost adds +2 per click
+    perClick = Math.floor(basePerClick * (1 + planets[currentPlanet].bonus));
+    updateDisplay();
+  }
+}
+function buyHyperClicker() {
+  if (stardust >= 1200) {
+    stardust -= 1200;
+    hyperClickerBought += 1;
+    basePerClick += 5 * hyperClickerBought; // Each purchase adds +5 per click
+    perClick = Math.floor(basePerClick * (1 + planets[currentPlanet].bonus));
+    updateDisplay();
+  }
+}
+function buyMegaAutoClicker() {
+  if (stardust >= 1500) {
+    stardust -= 1500;
+    megaAutoClickerBought += 1;
+    autoClickers += 5 * megaAutoClickerBought; // Each purchase adds +5 auto-clickers
+    updateDisplay();
+  }
+}
+
+// Achievements
+function checkAchievements() {
+  if (totalClicks >= 100) document.getElementById("achv1").style.display = "list-item";
+  if (autoClickers >= 5) document.getElementById("achv2").style.display = "list-item";
+  if (stardust >= 1000) document.getElementById("achv3").style.display = "list-item";
+}
+
+// Display update
+function updateDisplay() {
+  document.getElementById("stardust").textContent = stardust;
+  document.getElementById("upgradeCost").textContent = upgradeCost;
+  document.getElementById("autoClickerCost").textContent = autoClickerCost;
+  document.getElementById("autoClickers").textContent = autoClickers;
+}
+
+// Save/load/reset
+function saveGame() {
+  const save = {
+    stardust, basePerClick, upgradeCost, autoClickers, autoClickerCost,
+    totalClicks, currentPlanet, multiplierBought, fasterAutoBought,
+    clickBoostBought, hyperClickerBought, megaAutoClickerBought
+  };
+  localStorage.setItem("planetClicker", JSON.stringify(save));
+  alert("Game saved!");
+}
+function loadGame() {
+  const data = JSON.parse(localStorage.getItem("planetClicker"));
+  if (data) {
+    Object.assign(window, data);
+    perClick = Math.floor(basePerClick * (1 + planets[currentPlanet].bonus));
+    updatePlanetAppearance();
+    updateDisplay();
+    startAutoClickers();
+    alert("Game loaded!");
+  }
+}
+function resetGame() {
+  if (confirm("Reset your progress?")) {
+    localStorage.removeItem("planetClicker");
+    location.reload();
+  }
+}
+
+// Auto click
+function startAutoClickers() {
+  clearInterval(autoClickerInterval);
+  autoClickerInterval = setInterval(() => {
+    stardust += autoClickers;
+    checkAchievements();
+    updateDisplay();
+  }, autoInterval);
+}
+
+// Init
+window.onload = () => {
+  updatePlanetAppearance();
+  loadGame();
+  startAutoClickers();
+};
+</script>
+
+</body>
+</html>
+
